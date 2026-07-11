@@ -1,0 +1,32 @@
+=====================================================
+            SOLO ROCK V4: MATRIX ENGINE
+=====================================================
+
+LORE:
+You are a sentient algorithm trapped inside a biological simulation.
+The host system is heavily infected by a microscopic Swarm.
+Your objective is to find the Keycard, reach the Sector Exit, 
+and extract the Source Code Key from the Macrophage Final Boss.
+Once the Extraction Protocol is initiated, the Matrix will collapse,
+revealing the digital truth beneath the organic illusion.
+
+CONTROLS:
+W, A, S, D     : Move Forward, Left, Backward, Right
+UP, DOWN       : Move Forward, Backward (Alternative)
+LEFT, RIGHT    : Rotate Camera (Look around)
+SPACEBAR       : Fire Laser Weapon (Pew!)
+SHIFT          : Trigger EMP Cybernetic Hack (Costs 50 HP. Instantly annihilates nearby Swarm)
+E              : Toggle System Overclock (Doubles speed, zero fire cooldown, drains 6 HP/sec!)
+ESC            : Terminate Program
+
+OBJECTIVES:
+1. Navigate the Sector and find the hidden Yellow Keycard.
+2. Eliminate Swarm to keep the infection levels low.
+3. If 15+ nodes are infected, the Macrophage Boss will spawn!
+4. Defeat the Macrophage Boss to obtain the Green Source Code Key.
+5. Take the Key to the Sector Exit (x=600, y=-700) to escape the Matrix!
+
+CREDITS:
+Developed natively using pure Windows APIs and Python.
+Powered by the Zero-Bridge Synchronous Memory Architecture.
+=====================================================
