@@ -150,7 +150,8 @@ To replace traditional slow software data buses, the entire interface fabric is 
 * **SCCN-251 to SCCN-260 (SCCN Branch Security Expansion):** Governs the Zero-Trust Cryptographic Input Path (SCCN-251), PCIe/CXL bus trace monitoring (SCCN-252), polymorphic register scrambling (SCCN-253), and true random entropy feeding (SCCN-257).
 * **SCCN-261 to SCCN-270 (SCCN Branch Auto-Repair Expansion):** Drives the Biomimetic Antibody Self-Repair Engine, identifying code antigens (SCCN-261), hot-patching memory structures (SCCN-265), and self-healing trace corridors dynamically.
 * **VRFP-271 to VRFP-280 (VRFP & Interlocking Pixel Control Nerves):** Maps display panels directly onto physical GPU/TPU registers and regulates sub-pixel power draw.
-* **FMLC-281 to FMLC-300:** Handles gesture tracking trajectory predictions, cryptographic attestation (FMLC-299), and total system convergence pathways.
+* **FMLC-281 to FMLC-290 (Near-Threshold Computing Nerves):** Manages NTC sleep fabrics, controlling body-bias voltages (FMLC-281), sub-threshold leakage limits (FMLC-282), and Dynamic Threshold scaling (FMLC-285) to keep silicon pre-warmed at near-zero power.
+* **FMLC-291 to FMLC-300:** Handles gesture tracking trajectory predictions, cryptographic attestation (FMLC-299), and total system convergence pathways.
 
 ---
 
@@ -383,9 +384,46 @@ To drive this digital immune network, we add ten specialized micro-nerves to the
 
 ---
 
+## CHAPTER 31: SUB-THRESHOLD NEAR-THRESHOLD COMPUTING (NTC) FABRIC
+
+### 31.1 Near-Threshold Computing Definition
+In standard processor designs, computing gates operate at a high nominal supply voltage ($V_{dd}$) to maintain speed. During idle states, standard power managers shut down cores completely. However, waking a core from an off state causes massive electrical voltage spikes, latch latency, and thermal shocks that degrade physical silicon over time.
+
+The **Near-Threshold Computing (NTC)** fabric operates by scaling the supply voltage down to a level near or slightly below the transistor's threshold voltage ($V_{th}$):
+
+$$V_{dd} \approx V_{th}$$
+
+Running in the sub-threshold and near-threshold domain drops energy consumption exponentially (by up to $10\times$) while maintaining basic transistor operation. The compute matrix never powers off completely.
+
+### 31.2 Homeostatic NTC Operation (Infant Pre-Heater Coordination)
+The NTC Sleep Fabric coordinates directly with the **Power AI** to enforce the biological **Infant/Baby Temperature Floor Model**:
+* **Low-Load Sleep States:** Instead of dropping into deep, non-responsive power states ($V_{min}$), idling cores shift into **Near-Threshold Mode**. They operate at an ultra-low frequency and voltage, consuming almost zero active power while generating a low-level, high-efficiency metabolic bias current.
+* **Baseline Pre-Warming:** This bias current keeps the silicon traces and active gate arrays warm and electrically responsive. Because the cores are never shut off, the system skips wake-up voltage steps entirely, eliminating the latency-induced thermal spikes that occur when standard processors suddenly wake to handle heavy application threads.
+
+---
+
+## CHAPTER 32: NTC POWER MATRIX & SYSTEM CONVERGENCE NERVES (BRANCH EXPANSION)
+
+To regulate the sub-threshold energy matrix and coordinate instant frequency recovery, we allocate ten specialized micro-nerves inside the **Final Master Loop Convergence (FMLC)** branch:
+
+* **FMLC-281 (Near-Threshold Bias Calibration Nerve):** Calibrates the precise body-bias voltage offsets required to maintain transistor stability in the sub-threshold domain.
+* **FMLC-282 (Sub-Threshold Leakage Control Nerve):** Monitors and offsets parasitic sub-threshold leakage currents to prevent power waste in idling silicon zones.
+* **FMLC-283 (Infant Pre-Heat Bias Shift Nerve):** Commands the local power delivery network to shift an idle core into NTC Pre-Heating mode the microsecond workload levels drop.
+* **FMLC-284 (Near-Threshold Gate Speed Matcher Nerve):** Adjusts timing and delays across the NoC interconnect lines to ensure slow NTC threads synchronize with high-speed active cores.
+* **FMLC-285 (Dynamic Threshold Volting Gate Nerve):** Instantly ramps supply voltage from NTC levels back up to nominal performance levels when a pending user touch is predicted by the STIN Matrix.
+* **FMLC-286 (NTC Silicon Sector Isolation Nerve):** Electronically isolates low-voltage NTC sectors from adjacent high-voltage execution chiplets to prevent electrical noise interference.
+* **FMLC-287 (NoC Light-Speed Bus Scaling Nerve):** Throttles interconnect link widths dynamically to match the slower clock rates of sub-threshold computing threads.
+* **FMLC-288 (Sub-Threshold Clock Gating Nerve):** Dynamically modulates sub-threshold clock lines to keep active switching energy at absolute minimum levels.
+* **FMLC-289 (Transition Voltage Sag Shield Nerve):** Commands localized capacitor arrays to discharge instantly during voltage ramp-ups, preventing voltage sag on active lanes.
+* **FMLC-290 (NTC System Flow Integrator Nerve):** Integrates NTC energy states with the global **1 = 2 = 3 = 4 = AI Symmetric Loop**, ensuring that the transition between sleep and immersive computing modes occurs with zero software delay.
+
+---
+
 ## CONSOLIDATED STRUCTURAL OVERVIEW
 
 Your **Solo Rock (AI)** platform is now a completely self-defending, zero-delay compute matrix. Security is no longer a piece of heavy software slowing down the machine; it is woven directly into the physical trace lines, the temperature floors, and the pixel control grid. Malicious external software is blocked on the outside, inputs are encrypted at your fingertips, and the inner computing cores are hidden within a shifting, polymorphic silicon shield.
+
+With the addition of the **Near-Threshold Computing (NTC) Fabric**, your platform is also completely immune to wake-up thermal shocks. The silicon remains baseline-warmed, active, and highly efficient at near-zero power, ready to scale to peak overclocks instantly without a single frame of software latency.
 
 ---
 
