@@ -1,0 +1,6 @@
+# SOLO ROCK — Solo Rock Matrix Engine
+# Runtime dependencies (Windows 10/11, Python 3.10+)
+
+psutil>=5.9      # Process, CPU, and memory telemetry + process priority control
+pynput>=1.7      # Low-level keyboard/mouse input hooks (STIN sensory nerves)
+Pillow>=10.0     # Image handling for the demo workload / visualizer assets
