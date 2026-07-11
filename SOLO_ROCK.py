@@ -4,6 +4,7 @@ import threading
 import time
 import sys
 import os
+import random
 from multiprocessing import shared_memory
 
 # -------------------------------------------------------------------------
@@ -43,7 +44,148 @@ def get_amsv_block():
 amsv_block = get_amsv_block()
 
 # -------------------------------------------------------------------------
-# 2. WORLD DATA
+# 2. THE 200-NERVE DATABASE & ACTIVATION STATE
+# -------------------------------------------------------------------------
+NERVE_CHANNELS = []
+
+# Populate the 200 nerves
+NERVES_DATA = [
+    # CERN 1-25
+    ("CERN-001", "Main Intent Nerve", 0x00FFFF), ("CERN-002", "Context Freeze Nerve", 0x00FFFF),
+    ("CERN-003", "Heartbeat Monitor Nerve", 0x00FFFF), ("CERN-004", "Diagonal Cross-Talk Nerve", 0x00FFFF),
+    ("CERN-005", "Priority Cease Nerve", 0x00FFFF), ("CERN-006", "Error Isolation Nerve", 0x00FFFF),
+    ("CERN-007", "Telemetry Gathering Nerve", 0x00FFFF), ("CERN-008", "User Input Velocity Nerve", 0x00FFFF),
+    ("CERN-009", "Resource Throttling Nerve", 0x00FFFF), ("CERN-010", "Memory Cache Flush Nerve", 0x00FFFF),
+    ("CERN-011", "Asymmetric Thread Spawning Nerve", 0x00FFFF), ("CERN-012", "Interrupt Overriding Nerve", 0x00FFFF),
+    ("CERN-013", "Global Thermal Headroom Nerve", 0x00FFFF), ("CERN-014", "Task Target Profiler Nerve", 0x00FFFF),
+    ("CERN-015", "Coherency Matrix Trigger Nerve", 0x00FFFF), ("CERN-016", "External Bridge Isolation Nerve", 0x00FFFF),
+    ("CERN-017", "Bus Flush Authorization Nerve", 0x00FFFF), ("CERN-018", "Predictive Target Nerve", 0x00FFFF),
+    ("CERN-019", "Silicon Uncoupling Nerve", 0x00FFFF), ("CERN-020", "Emergency Throttle Override Nerve", 0x00FFFF),
+    ("CERN-021", "Predictive Asset Pre-stager Nerve", 0x00FFFF), ("CERN-022", "Asynchronous Signal Interceptor Nerve", 0x00FFFF),
+    ("CERN-023", "Symmetric Loop Normalizer Nerve", 0x00FFFF), ("CERN-024", "Clock Gating Authorization Nerve", 0x00FFFF),
+    ("CERN-025", "Transient Surge Predictor Nerve", 0x00FFFF),
+
+    # STIN 26-50
+    ("STIN-026", "Physical Touch Vector Nerve", 0xFFFF00), ("STIN-027", "Pain Trigger Nerve", 0xFFFF00),
+    ("STIN-028", "Reactive Pre-Ramp Nerve", 0xFFFF00), ("STIN-029", "Touch Jitter Filter Nerve", 0xFFFF00),
+    ("STIN-030", "Finger Velocity Tracker Nerve", 0xFFFF00), ("STIN-031", "Bypass Stack Nerve", 0xFFFF00),
+    ("STIN-032", "Pump Activation Nerve", 0xFFFF00), ("STIN-033", "Peripheral Response Nerve", 0xFFFF00),
+    ("STIN-034", "Macro-Loop Compression Nerve", 0xFFFF00), ("STIN-035", "Input Vector Alignment Nerve", 0xFFFF00),
+    ("STIN-036", "Display Frame Alignment Nerve", 0xFFFF00), ("STIN-037", "Dynamic Anti-Lag Nerve", 0xFFFF00),
+    ("STIN-038", "Continuous Gesture Nerve", 0xFFFF00), ("STIN-039", "Hardware Interrupt Anchor Nerve", 0xFFFF00),
+    ("STIN-040", "Predictive Collision Nerve", 0xFFFF00), ("STIN-041", "Transient Current Burst Nerve", 0xFFFF00),
+    ("STIN-042", "Multi-Touch Coordinate Nerve", 0xFFFF00), ("STIN-043", "Pressure Depth Mapping Nerve", 0xFFFF00),
+    ("STIN-044", "Zero-Idle Transition Nerve", 0xFFFF00), ("STIN-045", "Peripheral Input Routing Nerve", 0xFFFF00),
+    ("STIN-046", "Input Telemetry Sync Nerve", 0xFFFF00), ("STIN-047", "Trigger Predictive Path Nerve", 0xFFFF00),
+    ("STIN-048", "Input De-Bouncing Nerve", 0xFFFF00), ("STIN-049", "Tactile Calibration Nerve", 0xFFFF00),
+    ("STIN-050", "Ball Hit Realization Nerve", 0xFFFF00),
+
+    # PDEC 51-75
+    ("PDEC-051", "Transient Drop Neutralizer Nerve", 0x0000FF), ("PDEC-052", "Battery Thermal Guardian Nerve", 0x0000FF),
+    ("PDEC-053", "AC-to-DC Curve Optimizer Nerve", 0x0000FF), ("PDEC-054", "Silicon Power Delivery Nerve", 0x0000FF),
+    ("PDEC-055", "Safe Discharge Curve Nerve", 0x0000FF), ("PDEC-056", "Parallel Cell Shifter Nerve", 0x0000FF),
+    ("PDEC-057", "Motherboard PDN Stabilizer Nerve", 0x0000FF), ("PDEC-058", "Phase Ramping Catalyst Nerve", 0x0000FF),
+    ("PDEC-059", "Energy Preservation Nerve", 0x0000FF), ("PDEC-060", "High-Amp Spike Absorber Nerve", 0x0000FF),
+    ("PDEC-061", "Battery Resistance Monitor Nerve", 0x0000FF), ("PDEC-062", "GPU Wattage Router Nerve", 0x0000FF),
+    ("PDEC-063", "CPU Core Volting Nerve", 0x0000FF), ("PDEC-064", "Thermal Throttle Preemption Nerve", 0x0000FF),
+    ("PDEC-065", "Vmin Preservation Nerve", 0x0000FF), ("PDEC-066", "Interconnect Power Saver Nerve", 0x0000FF),
+    ("PDEC-067", "Dynamic Phase Gate Nerve", 0x0000FF), ("PDEC-068", "Charge Preservation Loop Nerve", 0x0000FF),
+    ("PDEC-069", "Motherboard Trace Thermometer Nerve", 0x0000FF), ("PDEC-070", "On-Die Regulator Link Nerve", 0x0000FF),
+    ("PDEC-071", "Transient Surge Mitigation Nerve", 0x0000FF), ("PDEC-072", "Display Backlight Wattage Nerve", 0x0000FF),
+    ("PDEC-073", "Memory Rail Voltage Nerve", 0x0000FF), ("PDEC-074", "Capacitor Discharge Regulator Nerve", 0x0000FF),
+    ("PDEC-075", "Global Efficiency Balance Nerve", 0x0000FF),
+
+    # CAIN 76-100
+    ("CAIN-076", "Instruction Stream Interceptor Nerve", 0xFF9900), ("CAIN-077", "Logic Type Slicer Nerve", 0xFF9900),
+    ("CAIN-078", "CPU Thread Router Nerve", 0xFF9900), ("CAIN-079", "GPU Pixel Pipeline Nerve", 0xFF9900),
+    ("CAIN-080", "Tensor Matrix Redirect Nerve", 0xFF9900), ("CAIN-081", "Cache Coherency Staging Nerve", 0xFF9900),
+    ("CAIN-082", "On-Die Fabric Overclocker Nerve", 0xFF9900), ("CAIN-083", "Chiplet Delay Mitregator Nerve", 0xFF9900),
+    ("CAIN-084", "Bus Clock Gating Nerve", 0xFF9900), ("CAIN-085", "High-End Mapping Coordinate Nerve", 0xFF9900),
+    ("CAIN-086", "Virtual Lookup Eliminator Nerve", 0xFF9900), ("CAIN-087", "Asymmetric Scheduler Bridge Nerve", 0xFF9900),
+    ("CAIN-088", "DMA Priority Zero Nerve", 0xFF9900), ("CAIN-089", "Texture Stream Accelerator Nerve", 0xFF9900),
+    ("CAIN-090", "Floating Point Matrix Nerve", 0xFF9900), ("CAIN-091", "On-Chip Bus Arbitrator Nerve", 0xFF9900),
+    ("CAIN-092", "Rasterization Sync Nerve", 0xFF9900), ("CAIN-093", "Neural Upscale Clock Nerve", 0xFF9900),
+    ("CAIN-094", "Compute Block Demarcation Nerve", 0xFF9900), ("CAIN-095", "Static RAM Ring Buffer Nerve", 0xFF9900),
+    ("CAIN-096", "Vector Core Load Balancer Nerve", 0xFF9900), ("CAIN-097", "Instruction Pipeline Prefetch Nerve", 0xFF9900),
+    ("CAIN-098", "Register Renaming Conduit Nerve", 0xFF9900), ("CAIN-099", "Silicon Sector Temperature Shifter Nerve", 0xFF9900),
+    ("CAIN-100", "Zero-Lag Execution Lock Nerve", 0xFF9900),
+
+    # FSMF 101-125
+    ("FSMF-101", "Junk Filter Nerve", 0xFF00FF), ("FSMF-102", "NVMe Burst Write Catalyst Nerve", 0xFF00FF),
+    ("FSMF-103", "Bus Flush Command Nerve", 0xFF00FF), ("FSMF-104", "VRAM Page Allocator Nerve", 0xFF00FF),
+    ("FSMF-105", "Stale Data Exudation Nerve", 0xFF00FF), ("FSMF-106", "Direct Storage Pathway Nerve", 0xFF00FF),
+    ("FSMF-107", "IO Latency Killer Nerve", 0xFF00FF), ("FSMF-108", "Memory Fragmentation Shield Nerve", 0xFF00FF),
+    ("FSMF-109", "Background Write Throttle Nerve", 0xFF00FF), ("FSMF-110", "Cache Pollution Guard Nerve", 0xFF00FF),
+    ("FSMF-111", "Asset Decompression Valve Nerve", 0xFF00FF), ("FSMF-112", "Memory Refresh Synchronizer Nerve", 0xFF00FF),
+    ("FSMF-113", "Bandwidth Rationing Nerve", 0xFF00FF), ("FSMF-114", "Dynamic Page Pre-loading Nerve", 0xFF00FF),
+    ("FSMF-115", "Zero-Copy Data Transfer Nerve", 0xFF00FF), ("FSMF-116", "Storage Pipeline Pre-Heater Nerve", 0xFF00FF),
+    ("FSMF-117", "ECC Error Suppressor Nerve", 0xFF00FF), ("FSMF-118", "Virtual Swap File Block Nerve", 0xFF00FF),
+    ("FSMF-119", "Asset Footprint Compression Nerve", 0xFF00FF), ("FSMF-120", "Direct Memory Mapping Governor Nerve", 0xFF00FF),
+    ("FSMF-121", "High-Speed Queue Bypasser Nerve", 0xFF00FF), ("FSMF-122", "Memory Pre-Fetch Filter Nerve", 0xFF00FF),
+    ("FSMF-123", "Bus Contention Arbitrator Nerve", 0xFF00FF), ("FSMF-124", "RAM Bus Overclock Unlocker Nerve", 0xFF00FF),
+    ("FSMF-125", "Garbage Collection Sync Nerve", 0xFF00FF),
+
+    # TSN 126-150
+    ("TSN-126", "Chassis Telemetry Ingestion Nerve", 0x00FF00), ("TSN-127", "Acoustic Noise Filter Nerve", 0x00FF00),
+    ("TSN-128", "Peripheral Polling Booster Nerve", 0x00FF00), ("TSN-129", "Gyro & IMU Ingestion Nerve", 0x00FF00),
+    ("TSN-130", "Fan Speed Override Nerve", 0x00FF00), ("TSN-131", "Voltage Sag Warning Nerve", 0x00FF00),
+    ("TSN-132", "Ambient Light Sensor Link Nerve", 0x00FF00), ("TSN-133", "Die Temperature Array Nerve", 0x00FF00),
+    ("TSN-134", "Haptic Feedback Sync Nerve", 0x00FF00), ("TSN-135", "External Network Ping Nerve", 0x00FF00),
+    ("TSN-136", "Packet Drop Mitigator Nerve", 0x00FF00), ("TSN-137", "Peripheral Power Watchdog Nerve", 0x00FF00),
+    ("TSN-138", "Transient Noise Suppressor Nerve", 0x00FF00), ("TSN-139", "Core Load Telemetry Nerve", 0x00FF00),
+    ("TSN-140", "Bus Utilization Tracker Nerve", 0x00FF00), ("TSN-141", "Display Panel Status Nerve", 0x00FF00),
+    ("TSN-142", "Audio Output Latency Nerve", 0x00FF00), ("TSN-143", "Clock Glitch Detector Nerve", 0x00FF00),
+    ("TSN-144", "Wireless Interference Filter Nerve", 0x00FF00), ("TSN-145", "Motherboard Flex Thermometer Nerve", 0x00FF00),
+    ("TSN-146", "Predictive Thermal Model Nerve", 0x00FF00), ("TSN-147", "Power Rail Monitor Nerve", 0x00FF00),
+    ("TSN-148", "External Sensor Interface Nerve", 0x00FF00), ("TSN-149", "Dynamic Noise Floor Adjuster Nerve", 0x00FF00),
+    ("TSN-150", "Telemetry Loop Closure Nerve", 0x00FF00),
+
+    # PPVO 151-175
+    ("PPVO-151", "Velocity Vector Tracker Nerve", 0xCCFF00), ("PPVO-152", "Collision Pre-Calculator Nerve", 0xCCFF00),
+    ("PPVO-153", "Variable Refresh Rate Sync Nerve", 0xCCFF00), ("PPVO-154", "DSC Frame Compressor Nerve", 0xCCFF00),
+    ("PPVO-155", "Frame-Gen Handoff Nerve", 0xCCFF00), ("PPVO-156", "Player Path Predictor Nerve", 0xCCFF00),
+    ("PPVO-157", "Display Pacing Alignment Nerve", 0xCCFF00), ("PPVO-158", "Post-Processing Valve Nerve", 0xCCFF00),
+    ("PPVO-159", "Ray-Tracing Denoise Catalyst Nerve", 0xCCFF00), ("PPVO-160", "Coordinate Matrix Sync Nerve", 0xCCFF00),
+    ("PPVO-161", "Audio Spatialization Nerve", 0xCCFF00), ("PPVO-162", "Object Culling Director Nerve", 0xCCFF00),
+    ("PPVO-163", "Dynamic Resolution Scaler Nerve", 0xCCFF00), ("PPVO-164", "Vertex Buffer Streamer Nerve", 0xCCFF00),
+    ("PPVO-165", "UI Overlay Blending Nerve", 0xCCFF00), ("PPVO-166", "Texture Filtering Accelerator Nerve", 0xCCFF00),
+    ("PPVO-167", "Shading Rate Governor Nerve", 0xCCFF00), ("PPVO-168", "Frame Buffer Lock Nerve", 0xCCFF00),
+    ("PPVO-169", "Specular Refraction Pre-stage Nerve", 0xCCFF00), ("PPVO-170", "Geometric Detail Level Nerve", 0xCCFF00),
+    ("PPVO-171", "Animation Thread Parallelizer Nerve", 0xCCFF00), ("PPVO-172", "Shadow Map Shadow Tracker Nerve", 0xCCFF00),
+    ("PPVO-173", "Display Backlight Zone Sync Nerve", 0xCCFF00), ("PPVO-174", "Physics State Serialization Nerve", 0xCCFF00),
+    ("PPVO-175", "Visual Output Loop Closer Nerve", 0xCCFF00),
+
+    # SCCN 176-200
+    ("SCCN-176", "Pink Loop Main Entry Nerve", 0xFF00FF), ("SCCN-177", "Light Blue Loop Main Entry Nerve", 0xFF00FF),
+    ("SCCN-178", "Teal Core Loop Carrier Nerve", 0xFF00FF), ("SCCN-179", "Magenta Core Loop Carrier Nerve", 0xFF00FF),
+    ("SCCN-180", "Salmon Core Loop Carrier Nerve", 0xFF00FF), ("SCCN-181", "Orange Core Loop Carrier Nerve", 0xFF00FF),
+    ("SCCN-182", "Symmetric Permutation Sync Nerve", 0xFF00FF), ("SCCN-183", "Outer Roof Ring Bridge Nerve", 0xFF00FF),
+    ("SCCN-184", "Outer Floor Ring Bridge Nerve", 0xFF00FF), ("SCCN-185", "Left Flank Recirculation Nerve", 0xFF00FF),
+    ("SCCN-186", "Right Flank Balance Recirculator Nerve", 0xFF00FF), ("SCCN-187", "Triple Ring Protection Lock Nerve", 0xFF00FF),
+    ("SCCN-188", "Shared Coherency Update Nerve", 0xFF00FF), ("SCCN-189", "Zero-Lag Verification Nerve", 0xFF00FF),
+    ("SCCN-190", "Asymmetric Balance Matrix Nerve", 0xFF00FF), ("SCCN-191", "Electrical Bus Valve Regulator Nerve", 0xFF00FF),
+    ("SCCN-192", "Suspended Stack Interceptor Nerve", 0xFF00FF), ("SCCN-193", "Omnidirectional Core Trigger Nerve", 0xFF00FF),
+    ("SCCN-194", "Symmetric State Resolver Nerve", 0xFF00FF), ("SCCN-195", "Chassis Heat Redirection Nerve", 0xFF00FF),
+    ("SCCN-196", "Direct Input Vector Injector Nerve", 0xFF00FF), ("SCCN-197", "Dynamic Resolution Trigger Nerve", 0xFF00FF),
+    ("SCCN-198", "Cache Allocation Lock Nerve", 0xFF00FF), ("SCCN-199", "Hardware Failure Prevention Nerve", 0xFF00FF),
+    ("SCCN-200", "Total Loop Closure Nerve", 0xFF00FF),
+]
+
+# Track current firing states of all 200 nerves
+nerve_states = [0.0] * 200
+
+def update_ansm_telemetry():
+    while True:
+        # Simulate neural action potentials firing down the channels
+        for i in range(200):
+            if random.random() < 0.15:
+                nerve_states[i] = 1.0 # Fire!
+            else:
+                nerve_states[i] = max(0.0, nerve_states[i] - 0.1) # Decay
+        time.sleep(0.05)
+
+# -------------------------------------------------------------------------
+# 3. WORLD DATA
 # -------------------------------------------------------------------------
 WORLD_MAP = [
     [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
@@ -65,7 +207,7 @@ WORLD_MAP = [
 ]
 
 # -------------------------------------------------------------------------
-# 3. AI HARDWARE CONTROLLER (THE OVERLORD)
+# 4. AI HARDWARE CONTROLLER (THE OVERLORD)
 # -------------------------------------------------------------------------
 def get_cpu_times():
     class FILETIME(ctypes.Structure):
@@ -94,7 +236,7 @@ def ai_hardware_overlord():
         last_idle, last_kernel, last_user = idle, kernel, user
 
 # -------------------------------------------------------------------------
-# 4. SENSORY INPUT & AUDIO
+# 5. SENSORY INPUT & AUDIO
 # -------------------------------------------------------------------------
 def input_nerve():
     user32 = ctypes.windll.user32
@@ -118,18 +260,19 @@ def audio_nerve():
         time.sleep(0.1)
 
 # -------------------------------------------------------------------------
-# 5. SOFTWARE ENGINE: RENDERER (PPVO)
+# 6. SOFTWARE ENGINE: RENDERER (PPVO)
 # -------------------------------------------------------------------------
 def render_nerve():
     user32, gdi32 = ctypes.windll.user32, ctypes.windll.gdi32
     class RECT(ctypes.Structure):
         _fields_ = [("left", ctypes.c_long), ("top", ctypes.c_long), ("right", ctypes.c_long), ("bottom", ctypes.c_long)]
 
-    hbrush_floor = gdi32.CreateSolidBrush(0x00333333)
-    hbrush_ceil = gdi32.CreateSolidBrush(0x00111111)
+    hbrush_floor = gdi32.CreateSolidBrush(0x00221111)
+    hbrush_ceil = gdi32.CreateSolidBrush(0x00050505)
     hbrush_wall = gdi32.CreateSolidBrush(0x0000FF00) # Green Walls
     hbrush_red = gdi32.CreateSolidBrush(0x000000FF) # Enemies
     hbrush_yellow = gdi32.CreateSolidBrush(0x0000FFFF) # Bullets
+    hbrush_black = gdi32.CreateSolidBrush(0x00000000)
     
     screen_w, screen_h = 800, 600
     
@@ -146,10 +289,10 @@ def render_nerve():
                     title = "=====================================================\n"
                     title += "        SOLO ROCK V4: MONOLITHIC AI EDITION\n"
                     title += "=====================================================\n\n"
-                    title += "ALL SYSTEMS UNIFIED IN A SINGLE FILE.\n"
-                    title += "The AI Overlord controls hardware capacity in real-time.\n"
+                    title += "ALL 200 NERVE CHANNELS CONNECTED & LOGGED IN REAL-TIME.\n"
+                    title += "Zero-Bridge Memory Architecture online.\n"
                     title += "Avoid the Swarm. Escape the Matrix.\n\n"
-                    title += "PRESS ENTER TO INITIALIZE NEURAL LINK...\n"
+                    title += "PRESS ENTER TO RUN DIAGNOSTICS & SYSTEM MATRIX...\n"
                     user32.DrawTextW(hdc, title, -1, ctypes.byref(rc_full), 0x0000)
                     user32.ReleaseDC(0, hdc)
                     time.sleep(0.016)
@@ -213,10 +356,10 @@ def render_nerve():
                                 brush = hbrush_red if i >= 61 else hbrush_yellow
                                 user32.FillRect(hdc, ctypes.byref(rc_s), brush)
 
-                # Draw Radar and Diagnostics
-                map_size, cell_size = 16, 6
+                # Draw Radar Minimap
+                map_size, cell_size = 16, 5
                 offset_x, offset_y = screen_w - (map_size * cell_size) - 20, 20
-                user32.FillRect(hdc, ctypes.byref(RECT(offset_x, offset_y, offset_x + map_size*cell_size, offset_y + map_size*cell_size)), gdi32.CreateSolidBrush(0x000000))
+                user32.FillRect(hdc, ctypes.byref(RECT(offset_x, offset_y, offset_x + map_size*cell_size, offset_y + map_size*cell_size)), hbrush_black)
                 
                 for y in range(map_size):
                     for x in range(map_size):
@@ -225,10 +368,52 @@ def render_nerve():
                 
                 user32.FillRect(hdc, ctypes.byref(RECT(offset_x + int(px)*cell_size, offset_y + int(py)*cell_size, offset_x + (int(px)+1)*cell_size, offset_y + (int(py)+1)*cell_size)), gdi32.CreateSolidBrush(0x00FFFFFF))
                 
-                rc_cpu = RECT(10, 10, 400, 50)
-                gdi32.SetTextColor(hdc, 0x000000FF if amsv_block.cpu_temp > 50 else 0x00FFFFFF)
+                # Draw the 200-Nerve ANSM Firing Grid (Right Side, below Radar)
+                grid_rows, grid_cols = 10, 20
+                box_w, box_h = 5, 5
+                grid_x_start = screen_w - (grid_cols * (box_w + 2)) - 20
+                grid_y_start = offset_y + (map_size * cell_size) + 15
+                
+                # Draw background label for the nerve matrix
+                gdi32.SetTextColor(hdc, 0x0000FF00)
                 gdi32.SetBkMode(hdc, 1)
-                user32.DrawTextW(hdc, f"AI MONOLITHIC CORE | CPU: {amsv_block.cpu_temp:.1f}% | ENGINE LIMIT: {amsv_block.gpu_load*100:.0f}%", -1, ctypes.byref(rc_cpu), 0)
+                rc_lbl = RECT(grid_x_start, grid_y_start - 12, screen_w - 20, grid_y_start)
+                user32.DrawTextW(hdc, "ANSM 200-NERVE SYSTEM MATRIX", -1, ctypes.byref(rc_lbl), 0)
+
+                for r in range(grid_rows):
+                    for c in range(grid_cols):
+                        idx = r * grid_cols + c
+                        if idx < 200:
+                            state = nerve_states[idx]
+                            color_val = NERVES_DATA[idx][2]
+                            # Blend color based on firing state
+                            if state > 0.1:
+                                r_c = int(((color_val >> 16) & 0xFF) * state)
+                                g_c = int(((color_val >> 8) & 0xFF) * state)
+                                b_c = int((color_val & 0xFF) * state)
+                                brush_color = (r_c << 16) | (g_c << 8) | b_c
+                            else:
+                                brush_color = 0x00222222 # Inactive / Dim grey
+                            
+                            brush = gdi32.CreateSolidBrush(brush_color)
+                            bx = grid_x_start + c * (box_w + 2)
+                            by = grid_y_start + r * (box_h + 2)
+                            user32.FillRect(hdc, ctypes.byref(RECT(bx, by, bx + box_w, by + box_h)), brush)
+                            gdi32.DeleteObject(brush)
+
+                # Diagnostic info overlay
+                rc_cpu = RECT(10, 10, 500, 50)
+                gdi32.SetTextColor(hdc, 0x000000FF if amsv_block.cpu_temp > 50 else 0x00FFFFFF)
+                user32.DrawTextW(hdc, f"ANSM CORE ACTIVE | CPU: {amsv_block.cpu_temp:.1f}% | ENGINE LIMIT: {amsv_block.gpu_load*100:.0f}%", -1, ctypes.byref(rc_cpu), 0)
+
+                # Show real-time telemetry from one random active nerve
+                active_nerves = [i for i, val in enumerate(nerve_states) if val > 0.8]
+                if active_nerves:
+                    fired_idx = random.choice(active_nerves)
+                    nerve_id, nerve_name, _ = NERVES_DATA[fired_idx]
+                    rc_log = RECT(10, screen_h - 30, 600, screen_h)
+                    gdi32.SetTextColor(hdc, 0x0000FF00)
+                    user32.DrawTextW(hdc, f"SIGNAL: [{nerve_id}] {nerve_name} -> EMITTING OK", -1, ctypes.byref(rc_log), 0)
 
                 user32.ReleaseDC(0, hdc)
                 time.sleep(0.016 / throttle) 
@@ -237,7 +422,7 @@ def render_nerve():
             pass
 
 # -------------------------------------------------------------------------
-# 6. SOFTWARE ENGINE: PHYSICS & SWARM AI (CAIN)
+# 7. SOFTWARE ENGINE: PHYSICS & SWARM AI (CAIN)
 # -------------------------------------------------------------------------
 def physics_nerve():
     amsv_block.entities[0].x, amsv_block.entities[0].y = -650.0, -650.0 # Spawn at 1,1
@@ -312,12 +497,12 @@ def physics_nerve():
         time.sleep(0.016)
 
 # -------------------------------------------------------------------------
-# 7. GRAND UNIFICATION ENTRY POINT
+# 8. GRAND UNIFICATION ENTRY POINT
 # -------------------------------------------------------------------------
 if __name__ == '__main__':
     print("\n=========================================================")
-    print(" SOLO ROCK V4: ULTIMATE MONOLITHIC EDITION")
-    print(" All Swarm AI, Audio, Engine & Hardware Logic Unified!")
+    print(" SOLO ROCK V4: ULTIMATE ANSM MONOLITHIC EDITION")
+    print(" All 200 Nerve Channels Unified into one System Matrix!")
     print("=========================================================\n")
     
     amsv_block.state = 5
@@ -327,7 +512,8 @@ if __name__ == '__main__':
         threading.Thread(target=ai_hardware_overlord, daemon=True),
         threading.Thread(target=input_nerve, daemon=True),
         threading.Thread(target=audio_nerve, daemon=True),
-        threading.Thread(target=physics_nerve, daemon=True)
+        threading.Thread(target=physics_nerve, daemon=True),
+        threading.Thread(target=update_ansm_telemetry, daemon=True)
     ]
     for t in threads: t.start()
     
