@@ -3,7 +3,7 @@
 **A bio-inspired, multi-agent hardware–software orchestrator for smarter task routing, thermal management, and power efficiency.**
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
-![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-informational)
+![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-informational)
 ![Status](https://img.shields.io/badge/Status-Hackathon%20Prototype-orange)
 ![Event](https://img.shields.io/badge/AMD%20Developer%20Hackathon-Act%20II-red)
 
@@ -22,6 +22,7 @@
   - [Nerve Departments](#nerve-departments)
 - [Dynamic Hardware Support](#dynamic-hardware-support)
 - [Getting Started](#getting-started)
+- [Dashboard](#dashboard)
 - [Running the System](#running-the-system)
 - [Benchmarks & Stress Tests](#benchmarks--stress-tests)
 - [Safety Model](#safety-model)
@@ -263,6 +264,21 @@ python run_control_loop.py --ticks 10 --interval 1
 
 ---
 
+## Dashboard
+
+For a visual, judge-friendly view of the same control loop, run the Streamlit dashboard:
+
+```bash
+pip install -r requirements-dashboard.txt
+streamlit run dashboard.py
+```
+
+It shows, live: the detected hardware profile (topology), real CPU/RAM telemetry with a rolling history chart, the Central AI's current decision (`FULL_RATE` / `BATCH` / `THROTTLE` / `EMERGENCY`), and a table of the same task routed through all four node permutation modes side by side.
+
+It also has a **🧪 Simulation Mode** — sliders for CPU temperature/load/RAM that let you demo `THROTTLE` and `EMERGENCY` behavior on demand, without needing a genuinely hot machine. Simulation mode only computes what the Decision Engine *would* decide; it never calls into the real Emergency Override, so it can never trigger an actual power-plan change. Only Live mode's `EMERGENCY` path can do that, and only on Windows with an administrator shell — identical to the safety model everywhere else in this README.
+
+---
+
 ## Running the System
 
 Run components in increasing order of scope — each step is safe to stop at any time with `Ctrl+C`:
@@ -272,6 +288,9 @@ Run components in increasing order of scope — each step is safe to stop at any
 #    real telemetry, and routes a demo task through all four node
 #    permutation modes every tick. Start here.
 python run_control_loop.py --ticks 10 --interval 1
+
+# 1b. Or the visual version of the same loop:
+streamlit run dashboard.py
 
 # 2. Boot sequence — initializes the Central AI and discovers all
 #    departments, managers, and nerve modules (read-only, no hardware control)
@@ -349,6 +368,8 @@ Solo-Rock-Matrix-Engine/
 │   ├── wire_registry.py        #   Inter-module wiring
 │   └── pipelines/              #   input / timing / runtime / performance / output
 ├── run_control_loop.py         # Cross-platform live control-loop demo (start here)
+├── dashboard.py                # Streamlit dashboard: visual view of the same control loop
+├── requirements-dashboard.txt  # Optional: only needed for dashboard.py
 ├── solo_rock_boot.py           # Boot sequence (discovery + init)
 ├── realtime_boot.py            # Real-time multi-process engine (Windows)
 ├── SOLO_ROCK.py                # Full monolithic demo build (Windows)
@@ -384,6 +405,7 @@ Honest disclosure for contributors and judges — this is a hackathon prototype,
 | Emergency Override loop | ✅ Working — verified end-to-end (trigger → throttle → cooldown → release) |
 | Peripheral nerve fabric & registries | ✅ Working — nerves load and fire |
 | Demo workload & stress tests | ✅ Working (Windows) |
+| Streamlit dashboard | ✅ Working — live telemetry, decision, and 4-mode routing, plus a safe simulation mode |
 | AMD ROCm SMI GPU telemetry (utilization/wattage) | 🚧 GPU *presence* detected; live GPU load/wattage feed still on roadmap |
 | FPGA arbiter | 🔬 Research concept with testbench |
 
@@ -394,7 +416,7 @@ Honest disclosure for contributors and judges — this is a hackathon prototype,
 - [ ] **AMD ROCm live telemetry** — `topology.py` already detects ROCm-visible AMD GPUs; wire `rocm-smi`/`pyrsmi` utilization and wattage into `GlobalStateVector` so `gpu_load`/`wattage` in the AMSV reflect the real device, not just its presence
 - [ ] **Linux power control** — a `cpufreq`/`RAPL`-based equivalent to `power_controller.py`'s Windows `powercfg` path, so THROTTLE decisions can act on Linux instead of staying telemetry-only
 - [ ] **DPU offload lane** — route network/storage I/O nerves through DPU-class devices where `topology.py` reports one present
-- [ ] **Telemetry dashboard** — live web visualization of the AMSV (see `v4_pixel_visualizer.html` for the current prototype)
+- [ ] **Dashboard history for GPU/DPU lanes** — extend `dashboard.py`'s history chart once live GPU telemetry lands above
 - [ ] **Test suite & CI** — automated regression coverage for the decision engine, node routing, and AMSV layout
 
 ---

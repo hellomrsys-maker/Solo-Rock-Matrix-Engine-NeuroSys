@@ -224,6 +224,6 @@ The core control loop (telemetry → decision → four-node routing → optional
 3. **Department-aware task payloads** (`nodes/node3_balance.py`) — currently balances purely on recent fire count; a richer signal (queue depth per manager, per-department thermal contribution) would make routing decisions sharper under mixed workloads.
 4. **DPU offload lane** — route network/storage I/O nerves through DPU-class devices where `topology.py` reports one present (today it's detection-only via an operator-declared environment flag, with no dispatch path yet).
 5. **New nerves** (`departments/<dept>/nerves/`) — the intended everyday contribution: one file, one behavior, auto-discovered.
-6. **Visualization** (`v4_pixel_visualizer.html`) — live AMSV dashboards, and/or a live view of `run_control_loop.py`'s decision trace; the memory layout in §3 is the read contract.
+6. **Visualization** — `dashboard.py` (Streamlit) already gives a live view of telemetry, the Central AI decision, and all four routing modes; `v4_pixel_visualizer.html` remains the lower-level AMSV pixel prototype. Extending either to plot GPU/DPU lanes once item 1 above lands is the natural next step; the memory layout in §3 is the read contract for both.
 
 When in doubt, preserve the three rules in §1 — they are the architecture.
