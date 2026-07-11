@@ -237,8 +237,8 @@ On the telemetry side the same pattern applies: the Hardware Reader tries the ri
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/hellomrsys-maker/Solo-Rock-Matrix-Engine.git
-cd Solo-Rock-Matrix-Engine
+git clone https://github.com/hellomrsys-maker/Solo-Rock-Matrix-Engine-NeuroSys.git
+cd Solo-Rock-Matrix-Engine-NeuroSys
 
 # 2. Create and activate a virtual environment
 python -m venv .venv
@@ -435,7 +435,7 @@ Bug reports and design discussion are welcome in GitHub Issues.
 
 ## License
 
-This project is intended to be fully open source. A `LICENSE` file will be finalized before hackathon submission (MIT recommended for maximum contributor accessibility).
+Released under the [MIT License](LICENSE) — free to use, modify, and distribute, including commercially, with attribution.
 
 ---
 
