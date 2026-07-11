@@ -227,10 +227,10 @@ On the telemetry side the same pattern applies: the Hardware Reader tries the ri
 
 | Requirement | Notes |
 |---|---|
-| **Windows 10 / 11** | The current telemetry and power-control drivers use WMI, ACPI, and `powercfg`. (Linux/ROCm support is on the [roadmap](#roadmap).) |
-| **Python 3.10+** | 64-bit recommended |
-| **Administrator shell** *(optional)* | Needed only for power-plan adjustments (`powercfg`) and deep ACPI sensor reads; the engine runs read-only without it |
-| **[LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor)** *(optional)* | If running, SOLO ROCK auto-detects its WMI namespace and gains far richer temperature/wattage telemetry |
+| **Python 3.10+** | 64-bit recommended. The control loop (topology detection, telemetry, decision engine, four-node routing) runs on **Windows, Linux, and macOS** — every hardware call degrades gracefully via `psutil` where a platform doesn't expose a richer interface. |
+| **Windows 10 / 11** *(optional, for the full demo)* | `SOLO_ROCK.py`, `realtime_boot.py`, and active power-plan throttling use Windows-only input hooks and `powercfg`. On other platforms these components are skipped automatically; the orchestration core still runs. |
+| **Administrator shell** *(optional, Windows only)* | Needed only for power-plan adjustments (`powercfg`) and deep ACPI sensor reads; the engine runs read-only without it |
+| **[LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor)** *(optional, Windows only)* | If running, SOLO ROCK auto-detects its WMI namespace and gains far richer temperature/wattage telemetry |
 
 ### Installation
 
@@ -241,7 +241,8 @@ cd Solo-Rock-Matrix-Engine
 
 # 2. Create and activate a virtual environment
 python -m venv .venv
-.venv\Scripts\activate        # Windows
+.venv\Scripts\activate         # Windows
+source .venv/bin/activate      # Linux / macOS
 
 # 3. Install dependencies
 pip install -r requirements.txt
@@ -252,9 +253,13 @@ pip install -r requirements.txt
 ```bash
 # Fast, safe, read-only: benchmarks the shared-memory core (no hardware control)
 python amsv_benchmark.py
+
+# See the live control loop actually make routing decisions from real
+# telemetry, on any OS — this is the fastest way to see the system work
+python run_control_loop.py --ticks 10 --interval 1
 ```
 
-If you see the AMSV vs. dictionary timing comparison, the shared-memory core is working.
+`run_control_loop.py` boots the Central AI, reads live CPU/RAM telemetry, classifies the workload, and dispatches a demo task through all four permutation modes of the symmetric node ring — printing the routing trace and final action (`DISPATCH` / `DISPATCH_BATCHED` / `HOLD` / `REJECT`) on every tick. It requires no admin rights and makes no hardware changes.
 
 ---
 
@@ -263,20 +268,25 @@ If you see the AMSV vs. dictionary timing comparison, the shared-memory core is 
 Run components in increasing order of scope — each step is safe to stop at any time with `Ctrl+C`:
 
 ```bash
-# 1. Boot sequence — initializes the Central AI and discovers all
+# 1. Live control loop — cross-platform. Boots the Central AI, reads
+#    real telemetry, and routes a demo task through all four node
+#    permutation modes every tick. Start here.
+python run_control_loop.py --ticks 10 --interval 1
+
+# 2. Boot sequence — initializes the Central AI and discovers all
 #    departments, managers, and nerve modules (read-only, no hardware control)
 python solo_rock_boot.py
 
-# 2. Real-time engine — starts the peripheral nerve threads and the
-#    live telemetry loop across isolated processes
+# 3. Real-time engine (Windows) — starts the peripheral nerve threads and
+#    the live telemetry loop across isolated processes
 python realtime_boot.py
 
-# 3. Full monolithic demo — the complete engine driving an interactive
-#    demo workload through all nerve channels simultaneously
+# 4. Full monolithic demo (Windows) — the complete engine driving an
+#    interactive demo workload through all nerve channels simultaneously
 python SOLO_ROCK.py
 ```
 
-> **Note:** Power-plan adjustments (the Autonomic System's active interventions) require an administrator shell. Without elevation, the engine runs in **observe-and-route mode**: full telemetry and task routing, no power-state changes. This is the recommended mode for a first run.
+> **Note:** Power-plan adjustments (the Autonomic System's active interventions) require an administrator shell on Windows, and are automatically disabled (telemetry-only mode) on other platforms. Without elevation, the engine runs in **observe-and-route mode**: full telemetry and task routing, no power-state changes. This is the recommended mode for a first run everywhere.
 
 To stop everything, `Ctrl+C` the foreground process. The shared-memory block is cleaned up on exit; if a crash ever leaves it behind, a reboot (or re-running the boot script, which reattaches) clears it.
 
@@ -299,10 +309,10 @@ For judging/demo purposes, the most telling comparison is running `sustained_str
 
 SOLO ROCK is an *orchestrator*, not an overclocking tool. Its hard rules:
 
-1. **Authorized interfaces only.** All hardware interaction goes through manufacturer- and OS-supported APIs: Windows power management (`powercfg`), WMI/ACPI telemetry, LibreHardwareMonitor's published namespace, and standard process priority/affinity controls. No undocumented registers, no firmware manipulation, no voltage/frequency pushes beyond stock limits.
-2. **Reduce, never exceed.** The power controller only moves settings *within* the OS-exposed range (e.g., capping maximum processor state to cool down). It never raises any limit above the manufacturer default.
+1. **Authorized interfaces only.** All hardware interaction goes through manufacturer- and OS-supported APIs: Windows power management (`powercfg`), WMI/ACPI telemetry, LibreHardwareMonitor's published namespace, cross-platform `psutil` sensors, and standard process priority/affinity controls. No undocumented registers, no firmware manipulation, no voltage/frequency pushes beyond stock limits.
+2. **Reduce, never exceed.** The power controller only moves settings *within* the OS-exposed range (e.g., capping maximum processor state to cool down). It never raises any limit above the manufacturer default. On platforms where no such control exists, it reports itself as unsupported and stays in telemetry-only mode rather than guessing.
 3. **Fail safe.** If a sensor can't be read, the engine assumes the conservative case. If the emergency override fires, it releases control back to the OS scheduler entirely.
-4. **Fully reversible.** Every setting the engine touches is a standard OS setting, restored on exit and always recoverable through normal Windows power options.
+4. **Fully reversible.** Every setting the engine touches is a standard OS setting, restored on exit and always recoverable through normal OS power options.
 
 ---
 
@@ -311,22 +321,23 @@ SOLO ROCK is an *orchestrator*, not an overclocking tool. Its hard rules:
 ```
 Solo-Rock-Matrix-Engine/
 ├── central_command/            # CENTRAL SYSTEM (Brain)
-│   ├── central_ai.py           #   CEO agent — final scheduling authority
-│   ├── decision_engine.py      #   Workload analysis → routing policy
-│   ├── global_state_vector.py  #   Consolidated system state
-│   ├── board_of_directors.py   #   Inter-department arbitration
+│   ├── central_ai.py           #   CEO agent — ties telemetry, policy, arbitration, safety into tick()
+│   ├── decision_engine.py      #   Workload analysis → FULL_RATE/BATCH/THROTTLE/EMERGENCY policy
+│   ├── global_state_vector.py  #   Live telemetry + hardware-topology snapshot
+│   ├── board_of_directors.py   #   Priority-based inter-department arbitration (starvation-safe)
 │   └── emergency_override.py   #   Safety reflex arc
 ├── nodes/                      # The four-node symmetric loop
 │   ├── node1_software.py       #   Software environment interface
-│   ├── node2_executive.py      #   Executive control node
-│   ├── node3_balance.py        #   Load balancing node
-│   ├── node4_hardware.py       #   Hardware feedback node
-│   └── ai_hub.py               #   Central routing hub
+│   ├── node2_executive.py      #   Applies the Central AI's current policy to a task
+│   ├── node3_balance.py        #   Assigns tasks to the least-loaded connected department
+│   ├── node4_hardware.py       #   Turns live telemetry into back-pressure / final_action
+│   └── ai_hub.py                #   Routes a payload through all 4 nodes in any of the 4 permutation orders
 ├── hardware_drivers/           # AUTONOMIC SYSTEM (Power & Thermal)
-│   ├── hardware_reader.py      #   Telemetry: temps, load, wattage (WMI/ACPI/LHM)
-│   ├── power_controller.py     #   OS power-plan control (powercfg)
-│   ├── process_controller.py   #   Background process priority management
-│   └── input_hook.py           #   Low-level input capture
+│   ├── topology.py             #   Cross-platform CPU/GPU(ROCm/CUDA)/DPU detection
+│   ├── hardware_reader.py      #   Telemetry: temps/load/RAM/battery (LHM/ACPI/WMI on Windows, psutil elsewhere)
+│   ├── power_controller.py     #   OS power-plan control (powercfg on Windows, safe no-op elsewhere)
+│   ├── process_controller.py   #   Cross-platform background process priority management
+│   └── input_hook.py           #   Low-level input capture (Windows/X11 via pynput)
 ├── departments/                # PERIPHERAL SYSTEM (nerve modules by department)
 │   ├── cern/  stin/  pdec/  cain/  fsmf/  tsn/  ppvo/  sccn/
 │   └── alus/  sens/  void/
@@ -337,9 +348,10 @@ Solo-Rock-Matrix-Engine/
 │   ├── pipeline_registry.py    #   Signal pipeline management
 │   ├── wire_registry.py        #   Inter-module wiring
 │   └── pipelines/              #   input / timing / runtime / performance / output
+├── run_control_loop.py         # Cross-platform live control-loop demo (start here)
 ├── solo_rock_boot.py           # Boot sequence (discovery + init)
-├── realtime_boot.py            # Real-time multi-process engine
-├── SOLO_ROCK.py                # Full monolithic demo build
+├── realtime_boot.py            # Real-time multi-process engine (Windows)
+├── SOLO_ROCK.py                # Full monolithic demo build (Windows)
 ├── amsv_benchmark.py           # Shared-memory core benchmark
 ├── stress_test.py              # Stress & thermal test suite
 ├── microneer_arbitrator_matrix.v   # FPGA concept: hardware nerve arbiter (Verilog)
@@ -363,25 +375,27 @@ Honest disclosure for contributors and judges — this is a hackathon prototype,
 | Component | Status |
 |---|---|
 | AMSV shared-memory core | ✅ Working, benchmarked |
-| Telemetry (Hardware Reader) | ✅ Working (LHM / ACPI / WMI fallback chain) |
-| Power & process control | ✅ Working (requires admin) |
+| Telemetry (Hardware Reader) | ✅ Working, cross-platform (LHM / ACPI / WMI on Windows, `psutil` sensors elsewhere) |
+| Hardware topology detection | ✅ Working — CPU/GPU (ROCm SMI, NVIDIA SMI, WMI, `lspci`) / DPU profiling |
+| Power & process control | ✅ Working on Windows (requires admin); safe telemetry-only no-op elsewhere |
+| Central AI decision logic | ✅ Working — real thermal/load/RAM thresholds drive FULL_RATE / BATCH / THROTTLE / EMERGENCY |
+| Board of Directors arbitration | ✅ Working — priority-based with a starvation guard |
+| Four-node routing (all 4 permutation modes) | ✅ Working — see `run_control_loop.py` |
+| Emergency Override loop | ✅ Working — verified end-to-end (trigger → throttle → cooldown → release) |
 | Peripheral nerve fabric & registries | ✅ Working — nerves load and fire |
-| Demo workload & stress tests | ✅ Working |
-| Central AI decision logic | 🚧 Scaffolded — interfaces defined, heuristics in progress |
-| Four-node routing implementations | 🚧 Scaffolded |
-| GPU/DPU-aware topology routing | 🗺️ Designed (see spec), implementation on roadmap |
+| Demo workload & stress tests | ✅ Working (Windows) |
+| AMD ROCm SMI GPU telemetry (utilization/wattage) | 🚧 GPU *presence* detected; live GPU load/wattage feed still on roadmap |
 | FPGA arbiter | 🔬 Research concept with testbench |
 
 ---
 
 ## Roadmap
 
-- [ ] **AMD ROCm integration** — GPU telemetry and utilization via ROCm SMI (`rocm-smi` / `pyrsmi`) for first-class AMD GPU routing on Linux
-- [ ] **Linux support** — port the Autonomic System to `hwmon`, `RAPL`, and `cpufreq` interfaces
-- [ ] **Central AI heuristics** — replace scaffolded decision stubs with measured, workload-classified routing policy
-- [ ] **DPU offload lane** — route network/storage I/O nerves through DPU-class devices where present
+- [ ] **AMD ROCm live telemetry** — `topology.py` already detects ROCm-visible AMD GPUs; wire `rocm-smi`/`pyrsmi` utilization and wattage into `GlobalStateVector` so `gpu_load`/`wattage` in the AMSV reflect the real device, not just its presence
+- [ ] **Linux power control** — a `cpufreq`/`RAPL`-based equivalent to `power_controller.py`'s Windows `powercfg` path, so THROTTLE decisions can act on Linux instead of staying telemetry-only
+- [ ] **DPU offload lane** — route network/storage I/O nerves through DPU-class devices where `topology.py` reports one present
 - [ ] **Telemetry dashboard** — live web visualization of the AMSV (see `v4_pixel_visualizer.html` for the current prototype)
-- [ ] **Test suite & CI** — automated regression coverage for the nerve registries and AMSV layout
+- [ ] **Test suite & CI** — automated regression coverage for the decision engine, node routing, and AMSV layout
 
 ---
 

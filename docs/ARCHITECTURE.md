@@ -41,30 +41,31 @@ Three rules drive every structural decision in this codebase:
 | Board of Directors | `central_command/board_of_directors.py` | Arbitration when departments make competing resource demands |
 | Emergency Override (reflex arc) | `central_command/emergency_override.py` | Unconditional intervention path when a safety threshold trips |
 
-> **Status note:** the Central System interfaces are defined but the decision heuristics are still scaffolded (`CentralAI.override_all` and node `route_payload` methods are stubs). This is the primary area of active development — see [Extension Points](#10-extension-points).
+> **Status note:** `CentralAI.tick()` is the live control cycle — it pulls a telemetry snapshot from `GlobalStateVector`, gets a `(action, reason)` from `DecisionEngine`, and hands off to `EmergencyOverride` automatically when `action == EMERGENCY`, releasing it again once conditions normalize. `override_all()` is the manual CEO kill switch. Run `python run_control_loop.py` to see this loop live.
 
 ### 2.2 The Four Nodes
 
 | Node | Code | Direction of concern |
 |---|---|---|
-| Node 1 — Software | `nodes/node1_software.py` | Application/runtime side of the loop: intake of task requests |
-| Node 2 — Executive | `nodes/node2_executive.py` | Policy application: priorities, context switches |
-| Node 3 — Balance | `nodes/node3_balance.py` | Queue and lane monitoring; reroute on choke points |
-| Node 4 — Hardware | `nodes/node4_hardware.py` | Silicon telemetry ingestion; source of back-pressure signals |
-| AI Hub | `nodes/ai_hub.py` | The center of the ring; routing fabric between the four nodes |
+| Node 1 — Software | `nodes/node1_software.py` | Application/runtime side of the loop: stamps a task as having entered via software |
+| Node 2 — Executive | `nodes/node2_executive.py` | Reads `CentralAI.last_action` and attaches it to the payload as `executive_policy` |
+| Node 3 — Balance | `nodes/node3_balance.py` | Assigns the task to whichever registered `DepartmentAI` has the lowest recent fire count (`assigned_department`) |
+| Node 4 — Hardware | `nodes/node4_hardware.py` | Converts the Central AI's action into `hardware_backpressure` (bool) and a `final_action` (`DISPATCH` / `DISPATCH_BATCHED` / `HOLD` / `REJECT`) |
+| AI Hub | `nodes/ai_hub.py` | The center of the ring; owns all four node instances and chains them per `MODE_ORDERS` |
 
-Each node exposes `route_payload(payload)` and holds `connected_departments`. The four permutation modes described in the spec (`1=2=3=4=AI`, `2=3=4=1=AI`, …) correspond to *which node initiates* a routing cycle through the hub — the code path is identical, only the entry point differs.
+Each node exposes `route_payload(payload)` and mutates a plain dict in place, appending to `payload["trace"]`. The four permutation modes described in the spec (`1=2=3=4=AI`, `2=3=4=1=AI`, `3=4=1=2=AI`, `4=1=2=3=AI`) are `AiHub.MODE_ORDERS["software_driven" | "executive_driven" | "balance_driven" | "hardware_driven"]` — same four nodes, same underlying `CentralAI` decision, different entry point into the ring. All four converge on the same `final_action` for a given telemetry snapshot, which is the property that makes hardware back-pressure visible no matter which node initiated the cycle.
 
 ### 2.3 Autonomic System — Power & Thermal
 
-| Concept | Code | OS interface used |
+| Concept | Code | Interface used |
 |---|---|---|
-| Temperature / load / wattage sensing | `hardware_drivers/hardware_reader.py` | LibreHardwareMonitor WMI namespace → `MSAcpi_ThermalZoneTemperature` (ACPI) → conservative fallback |
-| Power-envelope control | `hardware_drivers/power_controller.py` | `powercfg` (Windows power plans; e.g., subgroup `54533251-…` / setting `bc5038f7-…` = Maximum Processor State) |
-| Background-process restraint | `hardware_drivers/process_controller.py` | Standard OS process priority / affinity controls (via `psutil`) |
+| Temperature / load / RAM / battery sensing | `hardware_drivers/hardware_reader.py` | Windows: LibreHardwareMonitor WMI namespace → `MSAcpi_ThermalZoneTemperature` (ACPI) → `psutil`. Linux/macOS: `psutil.sensors_temperatures()` (hwmon/coretemp/k10temp) directly. |
+| Hardware topology (CPU/GPU/DPU) | `hardware_drivers/topology.py` | `rocm-smi`, `nvidia-smi`, WMI `Win32_VideoController`, `lspci` — first hit wins, de-duplicated |
+| Power-envelope control | `hardware_drivers/power_controller.py` | `powercfg` on Windows (subgroup `54533251-…` / setting `bc5038f7-…` = Maximum Processor State). Reports `supported = False` and no-ops safely everywhere else. |
+| Background-process restraint | `hardware_drivers/process_controller.py` | Standard OS process priority controls via `psutil.Process.nice()` — cross-platform: Windows priority classes on Windows, POSIX nice values (0–19) elsewhere |
 | Raw input capture | `hardware_drivers/input_hook.py` | `pynput` listener hooks |
 
-**Invariant:** this layer may only move settings *within* the manufacturer/OS-exposed range, and only *downward* relative to stock limits (throttle-to-cool, never boost-beyond-spec). See the Safety Model in the README.
+**Invariant:** this layer may only move settings *within* the manufacturer/OS-exposed range, and only *downward* relative to stock limits (throttle-to-cool, never boost-beyond-spec). On a platform with no such control, it reports itself unsupported rather than guessing. See the Safety Model in the README.
 
 ### 2.4 Peripheral System — the Nerve Fabric
 
@@ -168,15 +169,22 @@ Later spec chapters define further ranges (HEMM 201–215 memory mapping, TTSS 2
 Every telemetry read degrades gracefully through a fixed chain, so the engine works on machines with very different sensor exposure:
 
 ```
-CPU temperature:
+CPU temperature (Windows):
   LibreHardwareMonitor WMI (root/LibreHardwareMonitor, SensorType=Temperature)
     └─ fallback → ACPI thermal zone (root/wmi, MSAcpi_ThermalZoneTemperature, deci-Kelvin)
-         └─ fallback → 0.0 sentinel  ⇒  consumers treat "unknown" as "assume hot" (conservative)
+         └─ fallback → psutil.sensors_temperatures()
+              └─ fallback → 0.0 sentinel  ⇒  DecisionEngine treats 0.0 as "unknown, not urgent"
+                                              rather than fabricating a false thermal reading
+
+CPU temperature (Linux/macOS):
+  psutil.sensors_temperatures()  — checks coretemp/k10temp/cpu_thermal/zenpower keys first,
+  then any sensor present, so it works whether the box is Intel or AMD
+    └─ fallback → 0.0 sentinel
 ```
 
-The same shape applies to the topology question in the README: nerves declare the hardware class they drive, registries skip nerves whose hardware is absent, and the routing table is built from what actually probed present — CPU-only machines simply run with the CAIN GPU lanes unregistered.
+`hardware_drivers/topology.py` runs the equivalent chain for hardware *presence* rather than a live reading: `rocm-smi` → `nvidia-smi` → WMI `Win32_VideoController` → `lspci`, each contributing to a de-duplicated GPU list, plus an operator-declared `SOLO_ROCK_DPU_PRESENT` environment flag for DPU/SmartNIC systems (there is no universal userspace probe for those). `HardwareTopology.profile` collapses the result to `CPU_ONLY`, `CPU_GPU`, or `CPU_GPU_DPU` — the same three buckets the README's dynamic-hardware-support diagram describes — and `GlobalStateVector.hardware_profile()` is what `CentralAI` and the demo script read.
 
-Planned extensions of this chain (see README roadmap): ROCm SMI for AMD GPU telemetry, and Linux `hwmon`/RAPL/`cpufreq` equivalents for each Windows interface above.
+Planned extensions of this chain (see README roadmap): live ROCm SMI utilization/wattage (today only GPU *presence* is detected, not load), and a Linux `cpufreq`/RAPL equivalent to `power_controller.py`'s Windows `powercfg` path so THROTTLE decisions can act instead of staying telemetry-only outside Windows.
 
 ## 8. Process & Thread Topology
 
@@ -209,12 +217,13 @@ Process isolation means a fault in one subsystem cannot take down the loop — t
 
 ## 10. Extension Points
 
-Ordered by impact for new contributors:
+The core control loop (telemetry → decision → four-node routing → optional emergency override) is implemented and runnable via `python run_control_loop.py` on any platform. Ordered by impact for new contributors picking up where this leaves off:
 
-1. **Decision heuristics** (`central_command/decision_engine.py`, `central_ai.py`) — replace scaffolded stubs with measured policy: classify workload from AMSV telemetry history, emit hold/batch/reroute decisions.
-2. **Node routing** (`nodes/*.py`) — implement `route_payload` for each node so all four permutation modes are exercisable end-to-end.
-3. **New telemetry providers** (`hardware_drivers/hardware_reader.py`) — extend the fallback chain (ROCm SMI, Linux hwmon) without changing any consumer: consumers only ever read AMSV fields.
-4. **New nerves** (`departments/<dept>/nerves/`) — the intended everyday contribution: one file, one behavior, auto-discovered.
-5. **Visualization** (`v4_pixel_visualizer.html`) — live AMSV dashboards; the memory layout in §3 is the read contract.
+1. **Live GPU telemetry** (`central_command/global_state_vector.py`, `hardware_drivers/topology.py`) — `HardwareTopology` already detects *which* GPUs are present via ROCm/NVIDIA SMI; wire `rocm-smi --showuse`/`--showpower` output into `GlobalStateVector.sync_from_hardware()` so `amsv_block.gpu_load`/`wattage` reflect the real device instead of whatever the demo workload last wrote.
+2. **Linux/macOS power control** (`hardware_drivers/power_controller.py`) — implement a `cpufreq`/RAPL-based equivalent of `set_max_processor_state()` so a THROTTLE decision can actually act outside Windows instead of logging "unsupported".
+3. **Department-aware task payloads** (`nodes/node3_balance.py`) — currently balances purely on recent fire count; a richer signal (queue depth per manager, per-department thermal contribution) would make routing decisions sharper under mixed workloads.
+4. **DPU offload lane** — route network/storage I/O nerves through DPU-class devices where `topology.py` reports one present (today it's detection-only via an operator-declared environment flag, with no dispatch path yet).
+5. **New nerves** (`departments/<dept>/nerves/`) — the intended everyday contribution: one file, one behavior, auto-discovered.
+6. **Visualization** (`v4_pixel_visualizer.html`) — live AMSV dashboards, and/or a live view of `run_control_loop.py`'s decision trace; the memory layout in §3 is the read contract.
 
 When in doubt, preserve the three rules in §1 — they are the architecture.
