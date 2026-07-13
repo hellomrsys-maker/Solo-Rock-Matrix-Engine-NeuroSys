@@ -15,6 +15,7 @@
 
 - [The Problem](#the-problem)
 - [The Solution](#the-solution)
+- [Why This Matters](#why-this-matters)
 - [Architecture Overview](#architecture-overview)
   - [The Three Systems](#the-three-systems)
   - [The Four-Node Symmetric Loop](#the-four-node-symmetric-loop)
@@ -57,6 +58,39 @@ SOLO ROCK models its control plane on the most battle-tested distributed schedul
 | **Peripheral Nervous System** (sensory & motor nerves) | `departments/` + `infrastructure/` | Bridges software API calls to hardware SDKs; paces and batches tasks so hardware is fed efficiently, never flooded |
 
 The key insight: **don't make the hardware faster — make the traffic to it smarter.** SOLO ROCK operates entirely through authorized, manufacturer-supported interfaces (OS power management, standard telemetry providers, vendor SDKs) and simply routes work better.
+
+---
+
+## Why This Matters
+
+### What actually improves
+
+Every claim here is measurable with `benchmark.py` (see [Getting Started](#getting-started)) rather than asserted — the tool exists specifically so this section doesn't have to be taken on faith:
+
+- **Fewer redundant hardware hits.** When the Decision Engine reads `BATCH` or `THROTTLE`, repeated submissions get coalesced or paced instead of each one hitting hardware — directly reducing the instruction-cache-flooding pattern described above.
+- **Fewer avoidable thermal spikes.** Because pacing kicks in at `THERMAL_WARNING_C` (80°C), *before* `THERMAL_CRITICAL_C` (90°C), the system's own feedback loop (heat → slower responses → more redundant retries → more heat) gets interrupted a step earlier than waiting for the hardware's own thermal throttling to intervene.
+- **Less wasted power.** Cycles spent processing and discarding duplicate commands are cycles not doing real work — coalescing that traffic is a direct energy saving, not just a latency one.
+- **The same logic works whether one node or another notices first.** Because any of the four nodes (software, executive, balance, hardware) can initiate the same routing decision, back-pressure from a busy GPU/TPU is heard just as reliably as a policy decision made higher up — nothing depends on the software layer noticing on its own.
+
+### The market gap
+
+Three kinds of tools exist today, and none of them sit where SOLO ROCK does:
+
+| Existing approach | What it does | Where it falls short |
+|---|---|---|
+| **OS schedulers** (Windows/Linux kernel schedulers) | Time-slice processes across cores | Reactive and workload-agnostic — they intervene *after* contention, not before redundant traffic is generated, and treat a busy GPU/TPU the same as an idle one |
+| **Vendor tuning utilities** (Ryzen Master, Intel XTU, NVIDIA System Management, etc.) | Expose one manufacturer's own telemetry/tuning knobs | Locked to a single vendor's silicon; none of them coordinate a CPU + GPU + TPU mix as one topology, and none intervene at the *software dispatch* layer before a command is even sent |
+| **Enterprise power-capping / DCIM middleware** | Data-center-scale thermal and power budgeting | Proprietary, closed, deployed by operators at the rack/fleet level — not something an individual developer can run standalone, read the source of, or extend for a single workstation or laptop |
+
+The gap in the middle: an **open, cross-platform, hardware-agnostic layer that sits between the software dispatch loop and the hardware itself**, is auditable end-to-end, requires no kernel modification or admin rights to observe, and never overrides a manufacturer's own safety limits — only paces traffic *within* them. That's the specific niche this project targets, and as far as this project's authors are aware, no existing open-source tool occupies it in this form.
+
+### Why this is necessary now
+
+- **Software is issuing hardware-adjacent commands faster than a human ever did.** Agentic systems, automated pipelines, and inference-serving loops now generate retry/poll traffic at machine speed with no human in the loop to notice a hardware is "just busy" — the exact naive-retry pattern `benchmark.py` measures is becoming *more* common as more of the stack is automated, not less.
+- **Heterogeneous compute is now the default, not the exception.** CPU + GPU + TPU/NPU combinations (the same mix `hardware_drivers/topology.py` detects) are standard on modern AMD platforms and beyond — a scheduling layer that only understands one silicon type at a time is already behind where the hardware itself has moved.
+- **Power efficiency is not just a battery-life feature.** The same redundant-dispatch waste this project targets on a laptop compounds at datacenter scale into real electricity cost — the underlying inefficiency this project addresses doesn't disappear at scale, it multiplies.
+
+This is a hackathon-stage prototype, not a finished product (see [Project Status](#project-status) for an honest accounting of what's real vs. planned) — but the gap it's aimed at is not hypothetical, and the mechanism proposed to close it (advisory, cross-platform, symmetric arbitration) is demonstrable today with the tools in this repo.
 
 ---
 
