@@ -1,9 +1,6 @@
 import streamlit as st
-import pygame
 import math
 import random
-import numpy as np
-from collections import deque
 import time
 
 st.set_page_config(layout="wide", page_title="Solo Rock Matrix Engine")
@@ -135,10 +132,9 @@ if "game_state" not in st.session_state:
     }
 
 # =========================================================================
-# RENDERING FUNCTION (Using Matplotlib for Browser Compatibility)
+# RENDERING FUNCTION (Pillow-based, for browser compatibility)
 # =========================================================================
 def render_game():
-    import matplotlib.pyplot as plt
     from PIL import Image, ImageDraw, ImageFont
     
     gs = st.session_state.game_state
@@ -281,5 +277,5 @@ st.markdown("""
 - No keyboard input in web interface (use native version for full controls)
 - Simplified physics for performance
 
-**To run the native version:** `python SOLO_ROCK.py` (Windows only, requires pygame or DirectX)
+**To run the native version:** `python SOLO_ROCK.py` (Windows only, renders via raw Win32 GDI — no pygame or DirectX required)
 """)
