@@ -6,6 +6,11 @@ busy or hot, the Decision Engine looks at real numbers and returns one
 of a small set of actions that the Peripheral System (nodes) applies.
 """
 
+import os
+import sys
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 # Thresholds are intentionally conservative — they trigger well before
 # a manufacturer's own thermal/power protection would, so SOLO ROCK is
 # always advisory rather than a race against the hardware's own limits.
@@ -27,12 +32,21 @@ class DecisionEngine:
                  thermal_critical=THERMAL_CRITICAL_C,
                  cpu_load_high=CPU_LOAD_HIGH_PCT,
                  cpu_load_moderate=CPU_LOAD_MODERATE_PCT,
-                 ram_critical=RAM_CRITICAL_PCT):
-        self.thermal_warning = thermal_warning
-        self.thermal_critical = thermal_critical
-        self.cpu_load_high = cpu_load_high
-        self.cpu_load_moderate = cpu_load_moderate
-        self.ram_critical = ram_critical
+                 ram_critical=RAM_CRITICAL_PCT,
+                 config=None):
+        # If config provided, load thresholds from it
+        if config is not None:
+            self.thermal_warning = config.get('thermal.warning_celsius', thermal_warning)
+            self.thermal_critical = config.get('thermal.critical_celsius', thermal_critical)
+            self.cpu_load_high = config.get('cpu.load_high_percent', cpu_load_high)
+            self.cpu_load_moderate = CPU_LOAD_MODERATE_PCT  # Not in config, use default
+            self.ram_critical = config.get('ram.critical_percent', ram_critical)
+        else:
+            self.thermal_warning = thermal_warning
+            self.thermal_critical = thermal_critical
+            self.cpu_load_high = cpu_load_high
+            self.cpu_load_moderate = cpu_load_moderate
+            self.ram_critical = ram_critical
 
     def classify_workload(self, snapshot):
         """Rough bucket for the current load, useful for logging/telemetry dashboards."""

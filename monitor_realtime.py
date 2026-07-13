@@ -23,11 +23,12 @@ from diagnostics.core import DiagnosticsEngine
 class LiveMonitor:
     """Real-time monitoring of orchestration + issue detection."""
 
-    def __init__(self, duration_seconds=60, refresh_interval=2.0):
+    def __init__(self, duration_seconds=60, refresh_interval=2.0, config=None):
         self.duration = duration_seconds
         self.refresh_interval = refresh_interval
+        self.config = config
         self.ceo = CentralAI()
-        self.diag_engine = DiagnosticsEngine()
+        self.diag_engine = DiagnosticsEngine(config=config)
         self.history = deque(maxlen=30)  # 30-second rolling window
         self.decision_counts = {FULL_RATE: 0, BATCH: 0, THROTTLE: 0, EMERGENCY: 0}
 

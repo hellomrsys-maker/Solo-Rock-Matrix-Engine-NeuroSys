@@ -1,0 +1,30 @@
+# SOLO ROCK Default Configuration
+# Tune these values based on your hardware and workload
+
+thermal:
+  # Temperature thresholds (Celsius)
+  warning_celsius: 80        # Issue warning, prepare THROTTLE
+  critical_celsius: 90       # Trigger EMERGENCY mode
+  throttle_threshold: 75     # Start pacing earlier if trending hot
+
+cpu:
+  # CPU load thresholds (percent)
+  load_high_percent: 85      # Trigger BATCH/THROTTLE
+  load_critical_percent: 95  # Trigger EMERGENCY
+
+ram:
+  # RAM usage thresholds (percent)
+  critical_percent: 97       # Very high, usually triggers EMERGENCY
+
+decisions:
+  # Decision engine tuning
+  batch_threshold: 4         # Coalesce this many submissions in BATCH mode
+  throttle_pacing_ms: 50     # Delay (ms) between submissions in THROTTLE mode
+  emergency_hold_ms: 100     # Hold submissions this long in EMERGENCY mode
+
+# Uncomment to override specific values:
+# thermal:
+#   warning_celsius: 75    # More conservative
+#
+# cpu:
+#   load_high_percent: 75  # Trigger pacing earlier

@@ -23,6 +23,7 @@ from diagnostics.core import DiagnosticsEngine
 from monitor_realtime import LiveMonitor
 from benchmark_gpu import run_gpu_benchmark, print_report
 from report import ReportGenerator
+from config import load_config, ConfigError
 
 
 def cmd_diagnose(args):
@@ -32,7 +33,17 @@ def cmd_diagnose(args):
     print("=" * 70)
     print()
 
-    engine = DiagnosticsEngine()
+    # Load config if provided
+    config = None
+    if hasattr(args, 'config') and args.config:
+        try:
+            config = load_config(args.config)
+            print(f"[Config] Loaded thresholds from {args.config}\n")
+        except ConfigError as e:
+            print(f"[Config Error] {e}", file=sys.stderr)
+            return 2
+
+    engine = DiagnosticsEngine(config=config)
     issues = engine.run_diagnostics(verbose=args.verbose)
 
     if not issues:
@@ -58,7 +69,17 @@ def cmd_monitor(args):
     print("=" * 70)
     print()
 
-    monitor = LiveMonitor(duration_seconds=args.duration, refresh_interval=args.interval)
+    # Load config if provided
+    config = None
+    if hasattr(args, 'config') and args.config:
+        try:
+            config = load_config(args.config)
+            print(f"[Config] Loaded thresholds from {args.config}\n")
+        except ConfigError as e:
+            print(f"[Config Error] {e}", file=sys.stderr)
+            return 2
+
+    monitor = LiveMonitor(duration_seconds=args.duration, refresh_interval=args.interval, config=config)
     try:
         monitor.run()
         return 0
@@ -120,12 +141,16 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python solo_rock_cli.py diagnose              # Detect communication issues
-  python solo_rock_cli.py monitor --duration 60 # Monitor for 60 seconds
-  python solo_rock_cli.py benchmark --ticks 30  # Run 30-tick benchmark
-  python solo_rock_cli.py report --format text  # Generate text report
+  python solo_rock_cli.py diagnose                    # Detect communication issues
+  python solo_rock_cli.py --config custom.yaml diagnose  # Use custom thresholds
+  python solo_rock_cli.py monitor --duration 60       # Monitor for 60 seconds
+  python solo_rock_cli.py benchmark --ticks 30        # Run 30-tick benchmark
+  python solo_rock_cli.py report --format text        # Generate text report
         """
     )
+
+    # Global arguments (before subcommands)
+    parser.add_argument('--config', '-c', help='Path to YAML configuration file')
 
     subparsers = parser.add_subparsers(dest='command', help='Command to run')
 

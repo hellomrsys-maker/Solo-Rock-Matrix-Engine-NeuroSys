@@ -22,11 +22,12 @@ from central_command.decision_engine import DecisionEngine, FULL_RATE, BATCH, TH
 class DiagnosticsEngine:
     """Detects communication protocol issues between software and hardware."""
 
-    def __init__(self):
+    def __init__(self, config=None):
         self.topo = HardwareTopology()
         self.hw_reader = HardwareReader()
-        self.decision_engine = DecisionEngine()
+        self.decision_engine = DecisionEngine(config=config)
         self.issues = []
+        self.config = config
 
     def run_diagnostics(self, verbose=False, duration=5):
         """
