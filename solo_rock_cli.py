@@ -16,6 +16,8 @@ Usage:
 import argparse
 import sys
 import os
+import logging
+import traceback
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -25,6 +27,13 @@ from benchmark_gpu import run_gpu_benchmark, print_report
 from report import ReportGenerator
 from config import load_config, ConfigError
 
+# Setup logging (quiet by default, verbose with --verbose flags)
+logging.basicConfig(
+    level=logging.WARNING,
+    format='[%(levelname)s] %(message)s',
+    stream=sys.stderr
+)
+
 
 def cmd_diagnose(args):
     """Run system diagnostics to detect communication issues."""
@@ -33,6 +42,10 @@ def cmd_diagnose(args):
     print("=" * 70)
     print()
 
+    # Enable verbose logging if requested
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+
     # Load config if provided
     config = None
     if hasattr(args, 'config') and args.config:
@@ -40,26 +53,60 @@ def cmd_diagnose(args):
             config = load_config(args.config)
             print(f"[Config] Loaded thresholds from {args.config}\n")
         except ConfigError as e:
-            print(f"[Config Error] {e}", file=sys.stderr)
+            print(f"[Error] Configuration failed: {e}", file=sys.stderr)
+            print(f"[Hint] Check config file syntax and threshold ranges:", file=sys.stderr)
+            print(f"  - thermal.warning_celsius: 0-100", file=sys.stderr)
+            print(f"  - thermal.critical_celsius: > warning_celsius", file=sys.stderr)
+            print(f"  - cpu.load_high_percent: 0-100", file=sys.stderr)
+            print(f"  - ram.critical_percent: 0-100", file=sys.stderr)
+            return 2
+        except Exception as e:
+            print(f"[Error] Failed to load config: {e}", file=sys.stderr)
+            if args.verbose:
+                traceback.print_exc(file=sys.stderr)
             return 2
 
-    engine = DiagnosticsEngine(config=config)
-    issues = engine.run_diagnostics(verbose=args.verbose)
+    try:
+        engine = DiagnosticsEngine(config=config)
+        issues = engine.run_diagnostics(verbose=args.verbose)
+    except Exception as e:
+        print(f"[Fatal Error] Diagnostics failed: {e}", file=sys.stderr)
+        if args.verbose:
+            traceback.print_exc(file=sys.stderr)
+        return 2
 
     if not issues:
         print("✓ No critical communication issues detected.")
+        print()
+        print("SOLO ROCK is operating normally. The system has adequate")
+        print("headroom and is not experiencing retry storms, thermal")
+        print("mismanagement, or queue buildup.")
         return 0
 
     print(f"⚠ Found {len(issues)} issue(s):\n")
+    critical_count = 0
     for i, issue in enumerate(issues, 1):
-        print(f"{i}. {issue['title']}")
+        severity_icon = {
+            'critical': '🔴',
+            'high': '🟠',
+            'medium': '🟡',
+        }.get(issue.get('severity', 'info'), 'ℹ️')
+
+        if issue['severity'] == 'critical':
+            critical_count += 1
+
+        print(f"{i}. {severity_icon} {issue['title']}")
         print(f"   Severity: {issue['severity']}")
         print(f"   Details: {issue['description']}")
         if 'remediation' in issue:
-            print(f"   Fix: {issue['remediation']}")
+            print(f"   Remediation: {issue['remediation']}")
         print()
 
-    return 1 if any(i['severity'] == 'critical' for i in issues) else 1
+    if critical_count > 0:
+        print(f"⚠ {critical_count} critical issue(s) require immediate attention")
+        return 1
+
+    return 1
 
 
 def cmd_monitor(args):
@@ -76,16 +123,24 @@ def cmd_monitor(args):
             config = load_config(args.config)
             print(f"[Config] Loaded thresholds from {args.config}\n")
         except ConfigError as e:
-            print(f"[Config Error] {e}", file=sys.stderr)
+            print(f"[Error] Configuration failed: {e}", file=sys.stderr)
+            print(f"[Hint] Check config file syntax at: {args.config}", file=sys.stderr)
+            return 2
+        except Exception as e:
+            print(f"[Error] Failed to load config: {e}", file=sys.stderr)
             return 2
 
-    monitor = LiveMonitor(duration_seconds=args.duration, refresh_interval=args.interval, config=config)
     try:
+        monitor = LiveMonitor(duration_seconds=args.duration, refresh_interval=args.interval, config=config)
         monitor.run()
         return 0
     except KeyboardInterrupt:
         print("\n[Monitor] Stopped by user.")
-        return 0
+        return 130  # Standard exit code for SIGINT
+    except Exception as e:
+        print(f"\n[Fatal Error] Monitor crashed: {e}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        return 2
 
 
 def cmd_benchmark(args):
@@ -100,14 +155,23 @@ def cmd_benchmark(args):
               f"cpu_temp={snapshot['cpu_temp']:.1f}C -> {action} | "
               f"compute_result={result:.2e}")
 
-    results = run_gpu_benchmark(
-        ticks=args.ticks,
-        workload_size=args.workload_size,
-        on_tick=on_tick
-    )
-    print()
-    print_report(results)
-    return 0
+    try:
+        results = run_gpu_benchmark(
+            ticks=args.ticks,
+            workload_size=args.workload_size,
+            on_tick=on_tick
+        )
+        print()
+        print_report(results)
+        return 0
+    except KeyboardInterrupt:
+        print("\n[Benchmark] Stopped by user.")
+        return 130
+    except Exception as e:
+        print(f"\n[Fatal Error] Benchmark failed: {e}", file=sys.stderr)
+        print(f"[Hint] Try reducing --workload-size if memory is insufficient", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        return 2
 
 
 def cmd_report(args):
@@ -117,22 +181,32 @@ def cmd_report(args):
     print("=" * 70)
     print()
 
-    generator = ReportGenerator()
-    report = generator.generate()
+    try:
+        generator = ReportGenerator()
+        report = generator.generate()
 
-    if args.format == "json":
-        import json
-        print(json.dumps(report, indent=2))
-    elif args.format == "html":
-        html = generator.to_html(report)
-        filename = args.output or "solo_rock_report.html"
-        with open(filename, 'w') as f:
-            f.write(html)
-        print(f"Report saved to: {filename}")
-    else:  # text/markdown
-        print(generator.to_text(report))
+        if args.format == "json":
+            import json
+            print(json.dumps(report, indent=2))
+        elif args.format == "html":
+            html = generator.to_html(report)
+            filename = args.output or "solo_rock_report.html"
+            try:
+                with open(filename, 'w') as f:
+                    f.write(html)
+                print(f"✓ Report saved to: {filename}")
+            except IOError as e:
+                print(f"[Error] Failed to write report to {filename}: {e}", file=sys.stderr)
+                print(f"[Hint] Check disk space and file permissions", file=sys.stderr)
+                return 2
+        else:  # text/markdown
+            print(generator.to_text(report))
 
-    return 0
+        return 0
+    except Exception as e:
+        print(f"[Fatal Error] Report generation failed: {e}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        return 2
 
 
 def main():
@@ -188,4 +262,13 @@ Examples:
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    try:
+        exit_code = main()
+        sys.exit(exit_code)
+    except KeyboardInterrupt:
+        print("\n[Interrupted] Stopped by user", file=sys.stderr)
+        sys.exit(130)
+    except Exception as e:
+        print(f"\n[Fatal Error] Unexpected error: {e}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        sys.exit(255)

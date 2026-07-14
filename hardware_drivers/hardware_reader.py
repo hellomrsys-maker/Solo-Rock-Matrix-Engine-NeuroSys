@@ -10,9 +10,12 @@ Provider chain:
     Other   : psutil best-effort -> 0.0
 """
 
+import logging
 import platform
 import subprocess
 import psutil
+
+logger = logging.getLogger(__name__)
 
 _IS_WINDOWS = platform.system() == "Windows"
 
@@ -85,9 +88,11 @@ class HardwareReader:
         """Cross-platform fallback via psutil.sensors_temperatures() (Linux hwmon/coretemp)."""
         try:
             sensors = psutil.sensors_temperatures()
-        except (AttributeError, NotImplementedError):
+        except (AttributeError, NotImplementedError) as e:
+            logger.warning(f"CPU temperature sensor unavailable (psutil failed): {e}")
             return None
         if not sensors:
+            logger.warning("CPU temperature sensor unavailable (no hwmon sensors detected)")
             return None
 
         for key in ("coretemp", "k10temp", "cpu_thermal", "zenpower"):
@@ -98,15 +103,25 @@ class HardwareReader:
         for entries in sensors.values():
             if entries:
                 return entries[0].current
+
+        logger.warning("CPU temperature sensor unavailable (no recognized thermal zone)")
         return None
 
     def get_cpu_load(self):
         """CPU utilization percentage, cross-platform."""
-        return psutil.cpu_percent(interval=0.1)
+        try:
+            return psutil.cpu_percent(interval=0.1)
+        except Exception as e:
+            logger.warning(f"CPU load sensor unavailable: {e}")
+            return 0.0
 
     def get_ram_usage(self):
         """RAM utilization percentage, cross-platform."""
-        return psutil.virtual_memory().percent
+        try:
+            return psutil.virtual_memory().percent
+        except Exception as e:
+            logger.warning(f"RAM usage sensor unavailable: {e}")
+            return 0.0
 
     def get_battery_percent(self):
         """Battery charge percentage, or None if no battery is present."""
