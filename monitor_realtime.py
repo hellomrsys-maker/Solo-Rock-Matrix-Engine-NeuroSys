@@ -18,6 +18,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from central_command.central_ai import CentralAI
 from central_command.decision_engine import FULL_RATE, BATCH, THROTTLE, EMERGENCY
 from diagnostics.core import DiagnosticsEngine
+from diagnostics.logger import EventLogger
 
 
 class LiveMonitor:
@@ -31,16 +32,21 @@ class LiveMonitor:
         self.diag_engine = DiagnosticsEngine(config=config)
         self.history = deque(maxlen=30)  # 30-second rolling window
         self.decision_counts = {FULL_RATE: 0, BATCH: 0, THROTTLE: 0, EMERGENCY: 0}
+        self.logger = EventLogger()  # Initialize database logger
+        self.start_time = None
 
     def run(self):
         """Run live monitor for specified duration."""
-        start_time = time.time()
+        self.start_time = time.time()
+        tick_count = 0
 
-        while time.time() - start_time < self.duration:
+        while time.time() - self.start_time < self.duration:
             # Get current telemetry and decision
+            current_time = time.time()
             action, reason, snapshot = self.ceo.tick()
+
             self.history.append({
-                'timestamp': time.time(),
+                'timestamp': current_time,
                 'temp': snapshot.get('cpu_temp', 0.0),
                 'load': snapshot.get('cpu_load', 0.0),
                 'ram': snapshot.get('ram_usage', 0.0),
@@ -48,6 +54,23 @@ class LiveMonitor:
                 'reason': reason,
             })
             self.decision_counts[action] += 1
+
+            # Log event to database
+            self.logger.insert_event(
+                timestamp=current_time,
+                cpu_temp=snapshot.get('cpu_temp', None),
+                cpu_load=snapshot.get('cpu_load', None),
+                ram_usage=snapshot.get('ram_usage', None),
+                gpu_load=snapshot.get('gpu_load', None),
+                decision=action,
+                reason=reason,
+                action_taken=action,
+            )
+
+            # Periodic cleanup (once per week approximately)
+            tick_count += 1
+            if tick_count % 5000 == 0:
+                self.logger.cleanup_old_entries(days=30)
 
             # Clear screen and draw
             self._draw_screen()
