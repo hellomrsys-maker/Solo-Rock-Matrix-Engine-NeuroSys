@@ -20,12 +20,20 @@ from hardware_drivers.topology import HardwareTopology
 
 # Try GPU libraries in order of preference
 try:
+    import torch
+    HAS_TORCH = True
+    GPU_TYPE = "PyTorch Backend"
+except ImportError:
+    HAS_TORCH = False
+    GPU_TYPE = None
+
+try:
     import cupy as cp
     HAS_CUPY = True
-    GPU_TYPE = "NVIDIA (CuPy)"
+    if GPU_TYPE is None:
+        GPU_TYPE = "NVIDIA (CuPy)"
 except ImportError:
     HAS_CUPY = False
-    GPU_TYPE = None
 
 try:
     import numba.cuda
@@ -52,7 +60,17 @@ class GPUWorkload:
         self.backend = "CPU (NumPy)"
 
         # Detect what we can actually use
-        if HAS_CUPY and self.topo.gpus:
+        if HAS_TORCH:
+            self.gpu_available = torch.cuda.is_available()
+            if self.gpu_available:
+                self.backend = "GPU (PyTorch CUDA)"
+                self.device = torch.device("cuda")
+            else:
+                self.backend = "CPU (PyTorch CPU)"
+                self.device = torch.device("cpu")
+            self.A_torch = torch.randn(size, size, device=self.device)
+            self.B_torch = torch.randn(size, size, device=self.device)
+        elif HAS_CUPY and self.topo.gpus:
             self.backend = "GPU (NVIDIA/CuPy)"
             self.gpu_available = True
             self.A_gpu = cp.random.randn(size, size).astype(cp.float32)
@@ -69,7 +87,13 @@ class GPUWorkload:
 
     def compute(self):
         """Run one workload iteration. Returns a scalar result."""
-        if HAS_CUPY and self.gpu_available:
+        if HAS_TORCH:
+            C = torch.matmul(self.A_torch, self.B_torch)
+            if self.gpu_available:
+                torch.cuda.synchronize()
+            result = float(torch.sum(C))
+            return result
+        elif HAS_CUPY and self.gpu_available:
             # GPU path: matrix multiply on device
             C = cp.matmul(self.A_gpu, self.B_gpu)
             result = float(cp.sum(C))

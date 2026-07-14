@@ -53,39 +53,48 @@ def run_gpu_benchmark(ticks=20, workload_size=512, on_tick=None):
     print()
 
     for i in range(ticks):
-        # 1. Run the actual compute work
-        try:
-            result = workload.compute()
-            compute_results.append(result)
-        except Exception as e:
-            print(f"[Compute Error] {e}")
-            result = 0.0
-
-        # 2. Read telemetry and make routing decision (same as benchmark.py)
+        # 1. Read telemetry and make routing decision first
         action, reason, snapshot = ceo.tick()
         action_counts[action] += 1
         peak_temp = max(peak_temp, snapshot.get("cpu_temp", 0.0))
         peak_load = max(peak_load, snapshot.get("cpu_load", 0.0))
         peak_ram = max(peak_ram, snapshot.get("ram_usage", 0.0))
 
-        # 3. Count dispatches: naive hits hardware every time, SOLO ROCK decides per action
+        # 2. Count dispatches: naive hits hardware every time, SOLO ROCK decides per action
         naive_dispatches += 1
+        should_dispatch = False
 
         if action == FULL_RATE:
             solo_rock_dispatches += 1
+            should_dispatch = True
             batch_streak = throttle_streak = 0
         elif action == BATCH:
             batch_streak += 1
             throttle_streak = 0
             if batch_streak % BATCH_COALESCE_FACTOR == 0:
                 solo_rock_dispatches += 1
+                should_dispatch = True
         elif action == THROTTLE:
             throttle_streak += 1
             batch_streak = 0
             if throttle_streak % THROTTLE_PACE_FACTOR == 0:
                 solo_rock_dispatches += 1
+                should_dispatch = True
         elif action == EMERGENCY:
             batch_streak = throttle_streak = 0
+
+        # 3. Run the actual compute work ONLY if dispatched by Solo Rock
+        if should_dispatch:
+            try:
+                result = workload.compute()
+                compute_results.append(result)
+            except Exception as e:
+                print(f"[Compute Error] {e}")
+                result = 0.0
+                compute_results.append(result)
+        else:
+            result = 0.0
+            compute_results.append(result)
 
         if on_tick:
             on_tick(i, ticks, snapshot, action, reason, result)
