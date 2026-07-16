@@ -144,6 +144,61 @@ def main():
         st.write(f"CPU load — moderate: **{CPU_LOAD_MODERATE_PCT}%**, high: **{CPU_LOAD_HIGH_PCT}%**")
         st.write(f"RAM critical: **{RAM_CRITICAL_PCT}%**")
 
+    # --- Natural Language Query Interface ---
+    st.sidebar.divider()
+    st.sidebar.subheader("📝 Ask SOLO ROCK")
+
+    try:
+        from nlp.query_processor import QueryProcessor
+
+        if "query_processor" not in st.session_state:
+            st.session_state.query_processor = QueryProcessor()
+
+        query_processor = st.session_state.query_processor
+
+        # Show example queries
+        with st.sidebar.expander("💡 Example Queries", expanded=False):
+            suggestions = query_processor.get_suggestions()
+            for suggestion in suggestions:
+                st.caption(f"• {suggestion}")
+
+        # Query input
+        user_query = st.sidebar.text_input(
+            "What would you like to know?",
+            placeholder="e.g., 'show me a report' or 'how is it working'",
+            help="Ask in natural language. Try 'show report', 'status', 'trends', or 'help'"
+        )
+
+        # Process query if provided
+        if user_query and user_query.strip():
+            with st.sidebar.status("Processing query...", expanded=False):
+                result = query_processor.process(user_query.strip())
+                st.write(f"**Intent:** {result['intent']} ({result['confidence']:.0%} confidence)")
+
+            # Display result in main area
+            if result.get('error'):
+                st.warning(f"⚠️ {result['error']}")
+            else:
+                st.markdown("---")
+                st.markdown(f"## {result['title']}")
+
+                if result['type'] == 'status':
+                    # Format status response
+                    from nlp.handlers.status_handler import StatusHandler
+                    handler = StatusHandler()
+                    st.markdown(handler.format_for_display(result['raw_result']))
+                elif result['type'] == 'report':
+                    st.markdown(result['content'])
+                elif result['type'] == 'analysis':
+                    st.markdown(result['content'])
+                elif result['type'] == 'help':
+                    st.markdown(result['content'])
+                else:
+                    st.markdown(result['content'])
+
+    except ImportError:
+        st.sidebar.warning("NLU module not available. Update to enable natural language queries.")
+
     # --- Hardware profile ---
     topo = ceo.global_state.topology
     cols = st.columns(5)

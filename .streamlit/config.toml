@@ -1,0 +1,104 @@
+# SOLO ROCK Streamlit Configuration
+#
+# This configuration enables public access to SOLO ROCK dashboards.
+# All dashboards are accessible without authentication.
+#
+# For restricted access, use firewall rules or reverse proxy with auth.
+# See docs/WEB_SETUP.md for access control options.
+
+# ======================================================================
+# THEME & APPEARANCE
+# ======================================================================
+
+[theme]
+# SOLO ROCK brand colors
+primaryColor = "#00D084"
+backgroundColor = "#0E1117"
+secondaryBackgroundColor = "#262730"
+textColor = "#FAFAFA"
+font = "monospace"
+
+# ======================================================================
+# CLIENT SETTINGS
+# ======================================================================
+
+[client]
+# Show error details in UI (helpful for debugging)
+showErrorDetails = true
+
+# ======================================================================
+# LOGGER & LOGGING
+# ======================================================================
+
+[logger]
+# Log level: debug, info, warning, error, critical
+level = "info"
+
+# ======================================================================
+# SERVER & NETWORK
+# ======================================================================
+
+[server]
+# Listen on all network interfaces (required for network access)
+# Set to "localhost" or "127.0.0.1" to restrict to local access only
+address = "0.0.0.0"
+
+# Server port (default 8501)
+# port = 8501
+
+# Enable XSRF protection (recommended for public deployments)
+enableXsrfProtection = true
+
+# Maximum file upload size (MB)
+maxUploadSize = 200
+
+# Allow running the same app without rerunning query params
+allowRunningScript = true
+
+# ======================================================================
+# BROWSER & UI
+# ======================================================================
+
+[browser]
+# Gather usage stats? Set to false to disable telemetry
+gatherUsageStats = false
+
+# ======================================================================
+# RUNTIME
+# ======================================================================
+
+[client.toolbarMode]
+# Show toolbar with "Rerun" and "Settings" buttons
+# Options: "auto", "minimal", "developer"
+mode = "auto"
+
+# ======================================================================
+# CACHING
+# ======================================================================
+
+[cache]
+# Maximum entries in the cache
+maxEntries = 1000
+
+# TTL for cache entries (seconds)
+maxEntryAge = 3600
+
+# ======================================================================
+# MAPBOX (Optional)
+# ======================================================================
+
+# [mapbox]
+# token = ""
+
+# ======================================================================
+# DEPLOYMENT INFO
+# ======================================================================
+
+# For Streamlit Cloud deployment, this config will be used automatically.
+# For self-hosted, ensure server.address = "0.0.0.0" for public access.
+#
+# To run with custom settings:
+#   streamlit run dashboard.py --server.address 0.0.0.0 --server.port 8501
+#
+# To use this config file explicitly:
+#   streamlit run --config-file .streamlit/config.toml dashboard.py
