@@ -1,5 +1,5 @@
 # SOLO ROCK — Solo Rock Matrix Engine
-
+Application demolink https://solo-rock-matrix-engine-neurosys-qfsl4l7kqfkwzzd3bxyvzz.streamlit.app/
 **A bio-inspired, multi-agent hardware–software orchestrator for smarter task routing, thermal management, and power efficiency.**
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
